@@ -1,0 +1,3 @@
+In my math4a course, my normal calculator cannot deal with matrix and vectors. This make me sturggle to find the correct result, so I write this...
+It's not my idea to put it on github.
+if it's possible, please help me to perfect it :)
