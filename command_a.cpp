@@ -447,7 +447,7 @@ void implFuncInit()
 	function_list.push_back(new MYFUNC(REF, "REF"));
 }
 
-//IMPORTANT function stack not decleared !
+//IMPORTANT use a "varable stack" to support user define functions !
 MyVar* FindVar(const char* name) {
 	for (auto& a : mVar_list) {
 		if (strcmp(a.var_name, name) == 0) {
@@ -497,7 +497,7 @@ void _MS_pushVAL(MyVar& _val,bool is_ptr) {
 	default:
 		break;
 	}
-}//^^^___^^^ ARG_IN_STACK!
+}
 
 //Push rvalue
 void _MS_pushVAL_R(MyVar&& _val) {
@@ -523,7 +523,7 @@ void ExxCallFunc(cmNode*& ptr_expr, FuncBase* fptr) {
 	if ((fptr->_is_va_func()))goto _call_va_func;
 	for (int i = 0; i < fptr->get_arguments_cnts(); ++i) {
 		if ((fptr->arg_is_pointer_at(i))) {
-			//arg is reference, lvalue required
+			//arg is "reference", lvalue required
 			MyVar* x = FindVar(_expr->get_cstr());
 			if (x == nullptr || _expr->get_next()->type != cmNode::mExprEND) {
 				throw "func require lvalue";
@@ -621,14 +621,12 @@ MyVar CalcExpr_L(cmNode*& ptr_expr) {
 	}
 
 	MyVar ret;
+
 	//calculate rval (●'◡'●)
 	if (m_lvalue) {
 		ret =*m_lvalue = std::move(CalcExpr_L(_expr));
 	}
 	else {
-		_expr = ptr_expr;
-		
-		//restore pointer  (≧∇≦)ﾉ☆
 		_expr = ptr_expr;
 		ret = std::move(CalcExpr_R(_expr));
 	}
@@ -652,7 +650,6 @@ void _expr_end(cmNode*& ptr_expr) {
 MyVar CalcExpr_R(cmNode*& ptr_expr)
 {
 	MyVar ret;
-
 	cmNode* _expr = ptr_expr;
 	MyVar tmp_val_r;
 	bool flag_neg = false;
@@ -695,7 +692,6 @@ MyVar CalcExpr_R(cmNode*& ptr_expr)
 				break;
 			case '?':
 				_expr = _expr->get_next();
-				//supprt conditional exprission
 				if ((ret.my_data.num->_up)) {
 					//(//true? (...) : (...) )
 					ret = CalcExpr_R(_expr);
@@ -713,10 +709,16 @@ MyVar CalcExpr_R(cmNode*& ptr_expr)
 				goto func_return;
 				break;
 			case '[':
-				//TODO: Create Matrix
+				//TODO: 
 				break;
 			case ']':
 				goto func_return;
+			case '{':
+				//TODO
+				break;
+			case '}':
+				//TODO
+				break;
 			default:
 				_m_op = _expr->str[0];
 				break;
@@ -805,8 +807,7 @@ MyVar CalcExpr_R(cmNode*& ptr_expr)
 		}
 		if(_expr)_expr = _expr->get_next();
 	}
-
-	//prepare to return, set ptrヾ(≧▽≦*)o
+	//prepare to return, set pointer ヾ(≧▽≦*)o
 	func_return:
 	ptr_expr = _expr;
 	return ret;

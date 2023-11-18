@@ -60,10 +60,11 @@ public:
 		return pPrev == nullptr;
 	}
 
-	//prev = 0, prev->next = 0
 	void _break_list();
 	static void table_init();
-	static int word_chk(cmNode* _Node);
+
+	//static int word_chk(cmNode* _Node);
+	//TODO
 	const char* get_cstr()const;
 	void insert(cmNode* _Node);
 };
@@ -163,7 +164,6 @@ template<class FuncTy>class MyFunc;
 template<class _ret, class ... Args>
 class MyFunc<_ret(Args...)> :public FuncBase{
 protected:
-	//static_assert(_ret != void, "return type of function is void");
 	_ret(*function_pointer)(Args...);
 	template<int index>
 	constexpr void get_func_arg_list() {
