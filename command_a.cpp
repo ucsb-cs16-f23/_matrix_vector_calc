@@ -61,7 +61,7 @@ int cmNode::mov_to_next(char*& _str)
 void cmNode::clean_up()
 {
 	cmNode* ptr=this->pNext;
-	cmNode* pFree;
+	cmNode* pFree = NULL;
 	while (ptr)
 	{
 		pFree = ptr;
@@ -145,7 +145,6 @@ cmNode::cmNode(char* _str,int len)
 
 cmNode::~cmNode()
 {
-	clean_up();
 }
 
 void cmNode::append(cmNode* nd)
@@ -405,17 +404,18 @@ MyVar CreateVector(char* _A1)
 	int _cnt  = 0;
 	char* ap;
 	_VA_start(ap, _A1);
-	while (is_VA_end(ap))
+	while (!is_VA_end(ap))
 	{
 		ap -= sizeof(MyVar);
 		++_cnt;
 	}
 	_VA_start(ap,_A1);
+	MyVar* vp;
 	ret.assign_val(Vector(_cnt));
 	for (auto& a : *ret.my_data.vec) {
-		if (_VA_arg<MyVar>(ap).var_type != MyVar::number)
-			throw "^CREATE_VECTOR^, unable to assign value";
-		a = *_VA_arg<MyVar>(ap).my_data.num;
+		vp = &_VA_arg<MyVar>(ap);
+		a = *vp->my_data.num;
+		vp->~MyVar();
 	}
 	return ret;
 }
@@ -423,8 +423,10 @@ MyVar CreateVector(char* _A1)
 void procCommand_1(char* _command)
 {
 	auto len = strlen(_command);
+	cmNode* _expr_0 = NULL;
 	cmNode* _expr = NULL;
 	MyVar vr;
+	if (len == 0)goto func_end;
 	if (len > 10 && strncmp(_command, "create_var", 10) == 0) {
 		_command += 11;
 		len = 0;
@@ -433,21 +435,23 @@ void procCommand_1(char* _command)
 		string str(_command, len);
 		_command += len;
 		mVar_list.push_back(MyVar(MyVar::null_var, str.c_str(), NULL));
-		_expr = cmNode::create_list(_command);
+		_expr = _expr_0 = cmNode::create_list(_command);
 		vr = mVar_list.back().assign_val(CalcExpr_L(_expr));
 		goto func_end;
 	}
-	_expr = cmNode::create_list(_command);
+	_expr = _expr_0 = cmNode::create_list(_command);
 	vr = CalcExpr_L(_expr);
 func_end:
+	if(_expr_0)_expr_0->clean_up();
 	switch (vr.var_type)
 	{
 	case MyVar::matrix:
 		vr.my_data.mat->print_matrix();
 		break;
 	case MyVar::vector:
-		for (auto& a : *vr.my_data.vec)cout << a << ' ';
-		cout << endl;
+		//cout << "< ";
+		for (auto& a : *vr.my_data.vec)cout << a << " ";
+		cout<< endl;
 		break;
 	case MyVar::number:
 		cout << vr.my_data.num[0] << endl;
@@ -474,9 +478,12 @@ MyVar CreateMatrix(char* _A1)
 	int wid = _VA_arg<MyVar>(ap).my_data.num->_up;
 	int hei = _VA_arg<MyVar>(ap).my_data.num->_up;
 	ret.assign_val(Matrix(wid, hei));
+	MyVar* vp;
 	for (int i = 0; i < hei; ++i) {
 		for (int j = 0; j < wid; ++j) {
-			ret.my_data.mat->operator[](i)[j] = _VA_arg<MyVar>(ap).my_data.num[0];
+			vp = &_VA_arg<MyVar>(ap);
+			ret.my_data.mat->operator[](i)[j] = vp->my_data.num[0];
+			vp->~MyVar();
 		}
 	}
 	return ret;
@@ -488,6 +495,30 @@ void implFuncInit()
 	function_list.push_back(new MYFUNC(REF, "REF"));
 	function_list.push_back(new MyFunc_VA<typename _Rt<decltype(CreateMatrix)>::type>(&CreateMatrix, "CreateMatrix"));
 	function_list.push_back(new MYFUNC(SetSepIndix, "SetSepIndix"));
+	function_list.push_back(new MYFUNC(read_matrix, "read_matrix"));
+}
+
+MyVar read_matrix(Matrix* mat)
+{
+	int hei, wid;
+	cout << "dimision: width and height\n";
+	cin >> wid >> hei;
+	mat->SetDimision(wid, hei);
+	cout << "enter matrix"<<endl;
+	mat->read_matrix_cin();
+	MyVar ret;
+	ret.assign_val<Matrix>(*mat);
+	return ret;
+}
+
+void _clean_data_before_quit()
+{
+	operator delete(_m_stack_end);
+	operator delete(FuncBase::ret_area);
+	for (auto a : function_list) {
+		a->~FuncBase();
+	}
+	mVar_list.clear();
 }
 
 //IMPORTANT use a "varable stack" to support user define functions !
@@ -572,7 +603,7 @@ void ExxCallFunc(cmNode*& ptr_expr, FuncBase* fptr) {
 				throw "func require lvalue";
 			}
 			if (fptr->get_arg_type(i) != x->var_type)throw "Function BAD call with error arg type";
-			_MS_pushVAL(*x, true);
+			PUSH<void*>(x->my_data.native_ptr);
 			_expr = _expr->get_next();
 			if (!(_expr->is_end()))_expr = _expr->get_next();
 		}

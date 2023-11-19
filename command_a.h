@@ -101,7 +101,7 @@ POP() {
 #if STACK_PUSHPOP_CHECKLEVEL == 1
 	if (_My_Stack_Poiner+sizeof(Type) > _m_stack_begin)throw - 1;
 #endif
-	reinterpret_cast<Type*>(_My_Stack_Poiner)->~Type();
+	if(std::is_pointer<Type>::value == false )reinterpret_cast<Type*>(_My_Stack_Poiner)->~Type();
 	_My_Stack_Poiner += sizeof(Type);
 	return ret;
 }
@@ -137,6 +137,8 @@ public:
 	FuncBase(const FuncBase& b);
 	virtual ~FuncBase() {
 		delete name;
+		delete[] is_ptr_list;
+		delete[] m_type_list;
 	}
 	virtual void _call_func_ret_on_retarea()const {
 	}
@@ -172,9 +174,8 @@ protected:
 			std::remove_const<::std::remove_reference< ::std::remove_pointer<
 			_At<index, _ret(Args...)>
 			::type>::type>::type>::type>();//get argument type~
-		is_ptr_list[index] = ::std::is_pointer<_At<index, _ret(Args...)>>::value;
+		is_ptr_list[index] = ::std::is_pointer< _At<index, _ret(Args...)>::type >::value;
 		get_func_arg_list<index - 1>();
-
 	}
 	template<>
 	constexpr void get_func_arg_list<-1>(){
@@ -189,7 +190,6 @@ public:
 		f_return_pointer = ::std::is_pointer<_ret>::value;
 	}
 	MyFunc(const MyFunc& b):FuncBase(static_cast<const FuncBase&>(b)) {
-
 	}
 	virtual ~MyFunc(){
 	}
@@ -266,5 +266,9 @@ MyVar CreateVector(char*  _A1);
 void procCommand_1(char* _Str_command);
 
 void implFuncInit();
+
+MyVar read_matrix(Matrix* mat);
+
+void _clean_data_before_quit();
 
 #endif // !_COMMAND_A_H_

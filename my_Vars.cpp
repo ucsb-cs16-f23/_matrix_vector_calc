@@ -73,6 +73,9 @@ const MyVar& MyVar::op_mul(const MyVar& b)
         case number:
             this->assign_val(my_data.vec->mutiply_num(*b.my_data.num));
             break;
+        case matrix:
+            this->assign_val(b.my_data.mat->multipy_vec(*my_data.vec));
+            break;
         default:
             throw 10000;
             break;

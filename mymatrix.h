@@ -161,6 +161,7 @@ public:
 	Matrix(int wid, int hei);
 	Matrix(const Matrix& b);
 	Matrix(Matrix&& _right)noexcept;
+	~Matrix();
 	const Matrix& operator=(const Matrix& b);
 	const Matrix& operator=(Matrix&& _right)noexcept;
 	Mat_line operator [](int _line) { return Mat_line(mat[_line], width); };
@@ -181,6 +182,7 @@ public:
 	MyNum det()const;
 	Matrix MinorsMatrix();
 	Matrix CofactorsMatrix();
+	void SetDimision(int _Width, int _Height);
 };
 
 #endif // !_MY_MATRIX_H_

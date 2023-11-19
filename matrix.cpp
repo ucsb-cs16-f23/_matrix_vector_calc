@@ -1,4 +1,5 @@
-﻿#include <iostream>
+﻿#define _CRTDBG_MAP_ALLOC
+#include <iostream>
 #include"mymatrix.h"
 #include"my_Vars.h"
 #include"command_a.h"
@@ -7,6 +8,7 @@ using namespace std;
 
 int main()
 {
+    _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
     char* _m_iobuf = new char[2048];
     FunctionClassINIT(4096, 128);
     cmNode::table_init();
@@ -25,6 +27,8 @@ int main()
             cerr << "int type err" << endl;
         }
     }
+    delete[] _m_iobuf;
+    _clean_data_before_quit();
     return 0;
 }
 

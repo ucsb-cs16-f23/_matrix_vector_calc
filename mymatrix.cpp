@@ -108,8 +108,6 @@ void Matrix::row_echolon_form()
 			this->operator[](i).substract(temp);
 		}
 		++op_line;
-		//print_matrix();
-		//std::cout << "**********************" << std::endl;
 	}
 }
 
@@ -119,14 +117,10 @@ void Matrix::reduced_row_echolon_form()
 	row_echolon_form();
 	for (int i = height-1; i >0; --i)
 	{
-		//print_matrix();
-		//std::cout << "**********************start_line#" <<i<< std::endl;
 		pivot_position = nozero_entry(i);
 		if (pivot_position == -1) {
-			//std::cout << "skip_line\n";
 			continue;
 		}
-		//std::cout << "pivot_position#" << pivot_position << "\n";
 		for (int _line = i -1; _line >= 0; --_line)
 		{
 			if (mat[_line][pivot_position] == 0)continue;
@@ -411,6 +405,15 @@ Matrix Matrix::CofactorsMatrix()
 	return ret;
 }
 
+void Matrix::SetDimision(int _Width, int _Height)
+{
+	_free_space();
+	width = _Width;
+	height = _Height;
+	seperate_index = width - 1;
+	_allocate_space();
+}
+
 int Matrix::find_nozero_start_indix(int start_at, int line_inidx)
 {
 	int ret = -1;
@@ -497,6 +500,12 @@ Matrix::Matrix(Matrix&& _right)noexcept
 	seperate_index = _right.seperate_index;
 	_right.mat = nullptr;
 	_right.width = _right.height = 0;
+}
+
+Matrix::~Matrix()
+{
+	if(mat)_free_space();
+	mat = NULL;
 }
 
 const Matrix& Matrix::operator=(const Matrix& b)
@@ -864,7 +873,9 @@ const Vector& Vector::operator*=(const MyNum& _val)
 
 Vector Vector::mutiply_num(MyNum _val)
 {
-	return Vector();
+	Vector ret(*this);
+	for (auto& a : ret)a *= _val;
+	return ret;
 }
 
 void Vector::_set_v_neg()
