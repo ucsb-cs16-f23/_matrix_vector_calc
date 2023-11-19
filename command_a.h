@@ -134,6 +134,7 @@ public:
 	static void* ret_area;
 	FuncBase();
 	FuncBase(const char* _name);
+	FuncBase(const FuncBase& b);
 	virtual ~FuncBase() {
 		delete name;
 	}
@@ -187,8 +188,10 @@ public:
 		get_func_arg_list<sizeof...(Args) - 1>();
 		f_return_pointer = ::std::is_pointer<_ret>::value;
 	}
+	MyFunc(const MyFunc& b):FuncBase(static_cast<const FuncBase&>(b)) {
+
+	}
 	virtual ~MyFunc(){
-		delete[] m_type_list;
 	}
 	virtual void _call_func_ret_on_retarea()const override {
 		new(ret_area) _ret(function_pointer(POP<Args>()...));
@@ -211,13 +214,18 @@ void determine_sequence(cmNode* _expr);
 template<class _Ret>
 class MyFunc_VA :public FuncBase {
 protected:
-	_Ret(*fptr) (char*);
+	_Ret(*function_pointer) (char*);
 	char* _stack_ptr_before_call;
 public:
 	MyFunc_VA(_Ret(*Ptr)(char*), const char* _name) :FuncBase(_name) {
-		fptr = Ptr;
+		function_pointer = Ptr;
 		_stack_ptr_before_call = 0;
 		f_return_pointer = ::std::is_pointer<_Ret>::value;
+	}
+	MyFunc_VA(const MyFunc_VA& b):FuncBase(static_cast<const FuncBase&>(b)) {
+		function_pointer = b.function_pointer;
+		_stack_ptr_before_call = b._stack_ptr_before_call;
+		f_return_pointer = b.f_return_pointer;
 	}
 	virtual ~MyFunc_VA() {
 	}
@@ -225,7 +233,7 @@ public:
 		return true;
 	}
 	virtual void _call_func_ret_on_retarea()const override {
-		new(ret_area) _Ret(fptr(_stack_ptr_before_call));
+		new (ret_area) _Ret(function_pointer(_stack_ptr_before_call));
 		_My_Stack_Poiner = _stack_ptr_before_call;
 	}
 	virtual void record_stack_pointer()override {
@@ -237,7 +245,7 @@ public:
 (_FUNC_NAME_, _NAME_STR_)
 
 #define MYVA_FUNC(_FUNC_, _STR_NAME_) MyFunc_VA<\
-typename _Rt<decltype(_FUNC_)>::type>(_FUNC_,  _STR_NAME_)
+typename _Rt<decltype(_FUNC_)>::type>(&_FUNC_,  _STR_NAME_)
 
 inline bool is_VA_end(char* _va_list) {
 	return _va_list == _My_Stack_Poiner;

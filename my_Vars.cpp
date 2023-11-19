@@ -104,6 +104,7 @@ const MyVar& MyVar::op_mul(const MyVar& b)
 void MyVar::SetName(const char* _name)
 {
     if(var_name)delete[] var_name;
+    var_name = NULL;
     if (_name == NULL)return;
     auto len = strlen(_name) + 1;
     var_name = new char[len];

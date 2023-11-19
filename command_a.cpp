@@ -82,6 +82,7 @@ cmNode::cmNode(char* _str,int len)
 	str = _str;
 	pPrev = NULL;
 	pNext = nullptr;
+	length = len;
 	switch (op_table[_str[0]])
 	{
 	case 0:
@@ -139,7 +140,7 @@ cmNode::cmNode(char* _str,int len)
 		}
 	}
 	func_end:
-	length = len;
+	return;
 }
 
 cmNode::~cmNode()
@@ -301,6 +302,23 @@ FuncBase::FuncBase(const char* _name)
 	is_ptr_list = NULL;
 }
 
+FuncBase::FuncBase(const FuncBase& b)
+{
+	auto len = strlen(b.name) + 1;
+	name = new  char[len];
+	strcpy_s(name, len, b.name);
+	cnt = b.cnt;
+	if (cnt) {
+		m_type_list = new MyVar::_m_type[cnt];
+		is_ptr_list = new bool[cnt];
+		for (int i = 0; i < cnt; ++i) {
+			m_type_list[i] = b.m_type_list[i];
+			is_ptr_list[i] = b.is_ptr_list[i];
+		}
+		f_return_pointer = b.f_return_pointer;
+	}
+}
+
 int FuncBase::get_arguments_cnts()
 {
 	return  cnt;
@@ -409,15 +427,14 @@ void procCommand_1(char* _command)
 	MyVar vr;
 	if (len > 10 && strncmp(_command, "create_var", 10) == 0) {
 		_command += 11;
-		_expr = cmNode::create_list(_command);
-		CalcExpr_L(_expr);
 		len = 0;
 		while (_command[len] && _command[len] != ' ')
 			++len;
 		string str(_command, len);
+		_command += len;
 		mVar_list.push_back(MyVar(MyVar::null_var, str.c_str(), NULL));
 		_expr = cmNode::create_list(_command);
-		vr = mVar_list.back()= CalcExpr_L(_expr);
+		vr = mVar_list.back().assign_val(CalcExpr_L(_expr));
 		goto func_end;
 	}
 	_expr = cmNode::create_list(_command);
@@ -441,10 +458,36 @@ func_end:
 	tmp_var_list.clear();
 }
 
+MyVar SetSepIndix(Matrix* mat, MyNum indix) {
+	mat->seperate_index = indix._up;
+	MyVar ret;
+	ret.assign_val<Matrix>(*mat);
+	return ret;
+}
+
+MyVar CreateMatrix(char* _A1)
+{
+	MyVar ret;
+	int _cnt = 0;
+	char* ap;
+	_VA_start(ap, _A1);
+	int wid = _VA_arg<MyVar>(ap).my_data.num->_up;
+	int hei = _VA_arg<MyVar>(ap).my_data.num->_up;
+	ret.assign_val(Matrix(wid, hei));
+	for (int i = 0; i < hei; ++i) {
+		for (int j = 0; j < wid; ++j) {
+			ret.my_data.mat->operator[](i)[j] = _VA_arg<MyVar>(ap).my_data.num[0];
+		}
+	}
+	return ret;
+}
+
 void implFuncInit()
 {
 	function_list.push_back(new MYVA_FUNC(CreateVector, "CreateVector"));
 	function_list.push_back(new MYFUNC(REF, "REF"));
+	function_list.push_back(new MyFunc_VA<typename _Rt<decltype(CreateMatrix)>::type>(&CreateMatrix, "CreateMatrix"));
+	function_list.push_back(new MYFUNC(SetSepIndix, "SetSepIndix"));
 }
 
 //IMPORTANT use a "varable stack" to support user define functions !
@@ -543,14 +586,17 @@ void ExxCallFunc(cmNode*& ptr_expr, FuncBase* fptr) {
 	goto _func_ret;
 _call_va_func:
 	fptr->record_stack_pointer();
-	while (_expr->str[0]!=')')
+	while (true)
 	{
-		_MS_pushVAL_R(CalcExpr_L(_expr));
+		PUSH(CalcExpr_L(_expr));
+		if (_expr->str[0] == ')')break;
+		_expr = _expr->get_next();
 	}
 	_func_ret:
 	ptr_expr = _expr;
 	//call Function;
 	fptr->_call_func_ret_on_retarea();
+	return;
 }
 
 //Function Caller for rvalue return function (*/ω＼*)
@@ -562,7 +608,7 @@ MyVar RvalRetFunctionCaller(cmNode*& ptr_expr) {
 	{
 		auto cname = _expr->get_cstr();
 		for (auto a : function_list) {
-			if (strcmp(cname, a->name)) {
+			if (strcmp(cname, a->name)==0) {
 				fptr = a;
 				break;
 			}
@@ -584,7 +630,7 @@ MyVar* LvalFuncCaller(cmNode*& ptr_expr) {
 	{
 		auto cname = _expr->get_cstr();
 		for (auto a : function_list) {
-			if (strcmp(cname, a->name)) {
+			if (strcmp(cname, a->name)==0) {
 				fptr = a;
 				break;
 			}
@@ -624,11 +670,11 @@ MyVar CalcExpr_L(cmNode*& ptr_expr) {
 
 	//calculate rval (●'◡'●)
 	if (m_lvalue) {
-		ret =*m_lvalue = std::move(CalcExpr_L(_expr));
+		ret = m_lvalue->assign_val(std::move(CalcExpr_L(_expr)));
 	}
 	else {
 		_expr = ptr_expr;
-		ret = std::move(CalcExpr_R(_expr));
+		ret.assign_val(CalcExpr_R(_expr));
 	}
 	ptr_expr = _expr;
 	return ret;
@@ -667,7 +713,7 @@ MyVar CalcExpr_R(cmNode*& ptr_expr)
 			_M_helper_calcexpr(&ret, flag_neg, _m_op, tmp_val_r);
 			break;
 		case cmNode::mType::idFUNC:
-			tmp_val_r = RvalRetFunctionCaller(_expr);
+			tmp_val_r.assign_val(RvalRetFunctionCaller(_expr));
 			if (flag_not)flag_not = false, tmp_val_r._Not();
 			_M_helper_calcexpr(&ret, flag_neg, _m_op, tmp_val_r);
 			break;
@@ -694,7 +740,7 @@ MyVar CalcExpr_R(cmNode*& ptr_expr)
 				_expr = _expr->get_next();
 				if ((ret.my_data.num->_up)) {
 					//(//true? (...) : (...) )
-					ret = CalcExpr_R(_expr);
+					ret.assign_val(CalcExpr_R(_expr));
 					_expr = _expr->get_next();
 					_expr_end(_expr);
 				}
@@ -704,7 +750,7 @@ MyVar CalcExpr_R(cmNode*& ptr_expr)
 						_expr = _expr->get_next();
 					}
 					_expr = _expr->get_next();
-					ret = CalcExpr_R(_expr);
+					ret.assign_val(CalcExpr_R(_expr));
 				}
 				goto func_return;
 				break;
@@ -730,7 +776,7 @@ MyVar CalcExpr_R(cmNode*& ptr_expr)
 				{
 				case '<':
 					_expr = _expr->get_next();
-					tmp_val_r = CalcExpr_R(_expr);
+					tmp_val_r.assign_val(CalcExpr_R(_expr));
 					if (ret.var_type != MyVar::number &&
 						tmp_val_r.var_type != MyVar::number)throw "cannot compare...";
 					if (_expr->length == 2)
@@ -743,7 +789,7 @@ MyVar CalcExpr_R(cmNode*& ptr_expr)
 					break;
 				case '>':
 					_expr = _expr->get_next();
-					tmp_val_r = CalcExpr_R(_expr);
+					tmp_val_r.assign_val(CalcExpr_R(_expr));
 					if (ret.var_type != MyVar::number &&
 						tmp_val_r.var_type != MyVar::number)throw "cannot compare...";
 					if (_expr->length == 2)
@@ -755,7 +801,7 @@ MyVar CalcExpr_R(cmNode*& ptr_expr)
 					goto func_return;
 					break;
 				case '=':
-					tmp_val_r = CalcExpr_R(_expr);
+					tmp_val_r.assign_val(CalcExpr_R(_expr));
 					ret.assign_val(MyNum(
 						(int)(ret == tmp_val_r)
 					));
@@ -775,7 +821,7 @@ MyVar CalcExpr_R(cmNode*& ptr_expr)
 							_expr_end(_expr);
 							break;
 						}
-						tmp_val_r = CalcExpr_R(_expr);
+						tmp_val_r.assign_val(CalcExpr_R(_expr));
 						ret.assign_val(MyNum(
 							ret.my_data.num->_up || tmp_val_r.my_data.num->_up
 						));
@@ -789,7 +835,7 @@ MyVar CalcExpr_R(cmNode*& ptr_expr)
 							_expr_end(_expr);
 							break;
 						}
-						tmp_val_r = CalcExpr_R(_expr);
+						tmp_val_r.assign_val(CalcExpr_R(_expr));
 						ret.assign_val(MyNum(
 							ret.my_data.num->_up || tmp_val_r.my_data.num->_up
 						));

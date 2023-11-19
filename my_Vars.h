@@ -43,32 +43,45 @@ public:
 	~MyVar();
 
 	template<class T>
-	void assign_val(const T& _val) {
+	const MyVar& assign_val(const T& _val) {
 		if (var_type != _get_type_id<T>()) {
 			discard_data();
 			var_type = _get_type_id<T>();
 			allocate_space();
 		}
 		(reinterpret_cast<T*>(my_data.native_ptr))->operator=(_val);
+		return *this;
 	}
 	template<>
-	void assign_val<MyVar>(const MyVar& _Val)
+	const MyVar& assign_val<MyVar>(const MyVar& _Val)
 	{
-		this->operator=(_Val);
+		if (var_type != _Val.var_type) {
+			discard_data();
+			var_type = _Val.var_type;
+			allocate_space();
+		}
+		copy_data(_Val.my_data.native_ptr);
+		return *this;
 	}
 
 	template<class T>
-	void assign_val(T &&_val) {
+	const MyVar& assign_val(T &&_val) {
 		if (var_type != _get_type_id<T>()) {
 			discard_data();
 			var_type = _get_type_id<T>();
 			allocate_space();
 		}
 		(reinterpret_cast<T*>(my_data.native_ptr))->operator=(::std::move(_val));
+		return *this;
 	}
 	template<>
-	void assign_val<MyVar>(MyVar && _Val) {
-		this->operator=(std::move(_Val));
+	const MyVar& assign_val<MyVar>(MyVar && _right) {
+		discard_data();
+		my_data.native_ptr = _right.my_data.native_ptr;
+		_right.my_data.native_ptr = NULL;
+		var_type = _right.var_type;
+		_right.var_type = null_var;
+		return*this;
 	}
 	const MyVar& op_add(const MyVar& b);
 	const MyVar& op_mul(const MyVar& b);
