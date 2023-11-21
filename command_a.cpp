@@ -15,6 +15,8 @@ void* FuncBase::ret_area;
 char cmNode::ret_char_buffer[128];
 char _m_shared_left[3] = "(";
 char _m_shared_right[3] = ")";
+bool fWarningNewVar = true;
+bool fCallerUSRdefFUNC = false;
 
 
 int cmNode::mov_to_next(char*& _str)
@@ -363,6 +365,25 @@ void determine_sequence(cmNode* _expr) {
 	cmNode* o_expr = _expr;
 	while (_expr)
 	{
+		if (_expr->str[0] == '?'&&_expr->get_prev()->str[0]!=')') {
+			int cnt_r = 0;
+			cmNode* _x = _expr;
+			_x->insert(new cmNode(_m_shared_right, 1));
+			_x = _x->get_prev()->get_prev();
+			while ((!(_x->is_head())) && (cnt_r || _x->str[0] != '=' && _x->str[0] != '?' && _x->str[0] != ':'))
+			{
+				if (_x->str[0] == ')')++cnt_r;
+				if (_x->str[0] == '(')--cnt_r;
+				_x = _x->get_prev();
+			} 
+			if ((_x->is_head()))_x->insert(new cmNode(_m_shared_left, 1));
+			else _x->get_next()->insert(new cmNode(_m_shared_left, 1));
+		}
+		_expr = _expr->get_next();
+	}
+	_expr = o_expr;
+	while (_expr)
+	{
 		if (_expr->str[0] == '*' || _expr->str[0] == '/') {
 			_expr->get_prev()->insert(new cmNode(_m_shared_left, 1));
 			int cnt_left = 0;
@@ -457,11 +478,17 @@ void procCommand_1(char* _command)
 		string str(_command, len);
 		_command += len;
 		mVar_list.push_back(MyVar(MyVar::null_var, str.c_str(), NULL));
-		_expr = _expr_0 = cmNode::create_list(_command);
+		_expr_0 = cmNode::create_list(_command);
+		determine_sequence(_expr_0);
+		_expr = _expr_0 = _expr_0->find_head();
+		_expr->print_node();
 		vr = mVar_list.back().assign_val(CalcExpr_L(_expr));
 		goto func_end;
 	}
-	_expr = _expr_0 = cmNode::create_list(_command);
+	_expr_0 = cmNode::create_list(_command);
+	determine_sequence(_expr_0);
+	_expr = _expr_0 = _expr_0->find_head();
+	_expr->print_node();
 	vr = CalcExpr_L(_expr);
 func_end:
 	if(_expr_0)_expr_0->clean_up();
@@ -471,7 +498,6 @@ func_end:
 		vr.my_data.mat->print_matrix();
 		break;
 	case MyVar::vector:
-		//cout << "< ";
 		for (auto& a : *vr.my_data.vec)cout << a << " ";
 		cout<< endl;
 		break;
@@ -553,7 +579,7 @@ MyVar* FindVar(const char* name) {
 			return&a;
 		}
 	}
-	return 0;
+	return NULL;
 }
 
 //HELPER FUNCTION   (●'◡'●)
@@ -699,34 +725,108 @@ MyVar* LvalFuncCaller(cmNode*& ptr_expr) {
 }
 
 MyVar CalcExpr_L(cmNode*& ptr_expr) {
-	MyVar *m_lvalue = NULL;
+	void *m_lvalue = NULL;
 	cmNode* _expr = ptr_expr;
+	int lval_assign_ty = 0; // 2 :assign_eneryting , 1 number, other assign_vector
 
 	//^^^ find '=' ^^^
 	//GET lvalue, if no lvalue (no '=' ) lvlaue == null
-	while ((_expr) && _expr->type != cmNode::mExprEND) {
+	{
+		int c_l_1 = 0;
+		int c_l_2 = 0;
+		while (_expr&&(c_l_1 ||c_l_2||_expr->type !=cmNode::mExprEND)) {
 
-		if (_expr->str[0] == '(')break;
-		//treated as rval ,for case such as "a = (b = c) + 1;"
+			if (_expr->str[0] == '{')break;
+			if (_expr->str[0] == '(') { ++c_l_1; goto _while_end; }
+			if(_expr->str[0] == ')') { --c_l_1; goto _while_end; }
+			if (_expr->str[0] == '[') { ++c_l_2; goto _while_end; }
+			if (_expr->str[0] == '[') { --c_l_2; goto _while_end; }
 
-		if (_expr->str[0] == '='&&_expr->length==1) {
-			auto cnme = ptr_expr->get_cstr();
-			if (ptr_expr->type == cmNode::idFUNC) {
-				m_lvalue = LvalFuncCaller(ptr_expr);
+			if (_expr->str[0] == '=' && _expr->length == 1) {
+				auto cnme = ptr_expr->get_cstr();
+				if (ptr_expr->type == cmNode::idFUNC) {
+					m_lvalue = LvalFuncCaller(ptr_expr);
+				}
+				else
+				{
+					m_lvalue = FindVar(cnme);
+					if (m_lvalue == NULL) {
+						if (fCallerUSRdefFUNC) {
+
+						}
+						else if (fWarningNewVar)
+						{
+							cout << "Warning: no such varable \"" << cnme << "\" auto create it\n";
+							mVar_list.push_back(MyVar(MyVar::null_var, cnme, NULL));
+							m_lvalue = &mVar_list.back();
+						}
+						_expr = _expr->get_next();
+						goto rval_calc;
+					}
+				}
+				_expr = _expr->get_next();
+				break;
 			}
-			else 
-				m_lvalue = FindVar(cnme);
+			_while_end:
 			_expr = _expr->get_next();
+		}
+	}
+	if (m_lvalue)ptr_expr = ptr_expr->get_next();
+	if (m_lvalue &&ptr_expr->str[0] == '[') {
+		ptr_expr = ptr_expr->get_next();
+		MyVar va = CalcExpr_L(ptr_expr);// "]"
+		if (va.var_type != MyVar::number) throw 19;
+		ptr_expr = ptr_expr->get_next();
+		switch (reinterpret_cast<MyVar*>(m_lvalue)->var_type)
+		{
+		case MyVar::vector:
+			lval_assign_ty = 1;
+			if (reinterpret_cast<MyVar*>(m_lvalue)->my_data.vec->length <=
+				va.my_data.num->_up) throw "SIGSEGV";
+			m_lvalue = (reinterpret_cast<MyVar*>(m_lvalue)->my_data.vec->data()) +
+				va.my_data.num->_up;//number_pointer
+			break;
+		case MyVar::matrix:
+			lval_assign_ty = sizeof(MyNum) * reinterpret_cast<MyVar*>(m_lvalue)->my_data.mat->width;
+			if (reinterpret_cast<MyVar*>(m_lvalue)->my_data.mat->width <=
+				va.my_data.num->_up) throw "SIGSEGV";
+			m_lvalue = reinterpret_cast<MyVar*>(m_lvalue)->my_data.mat->lval_ref(va.my_data.num->_up);
+			if (ptr_expr->str[0] == '[') {
+				ptr_expr = ptr_expr->get_next();
+				va.assign_val(CalcExpr_L(ptr_expr));
+				if (va.var_type != MyVar::number) throw 19;
+				lval_assign_ty /= sizeof(MyNum);
+				if(lval_assign_ty<= va.my_data.num->_up) throw "SIGSEGV";
+				m_lvalue = reinterpret_cast<MyNum*>(m_lvalue) +
+					va.my_data.num->_up;
+				lval_assign_ty = 1;
+			}
+			break;
+		default:
+			throw "not a vector or matrix, operator []";
 			break;
 		}
-		_expr = _expr->get_next();
 	}
-
+rval_calc:
 	MyVar ret;
-
 	//calculate rval (●'◡'●)
 	if (m_lvalue) {
-		ret = m_lvalue->assign_val(std::move(CalcExpr_L(_expr)));
+		ret.assign_val(CalcExpr_L(_expr));
+		switch (lval_assign_ty)
+		{
+		case 0:
+			reinterpret_cast<MyVar*>(m_lvalue)->assign_val<MyVar>(ret);
+			break;
+		case 1:
+			if (ret.var_type != MyVar::number)throw "unable to assign ... -> lval";
+			*reinterpret_cast<MyNum*>(m_lvalue) = *ret.my_data.num;
+			break;
+		default:
+			if (ret.var_type != MyVar::vector)throw "unable to assign ... -> lval";
+			memcpy_s(m_lvalue, lval_assign_ty, ret.my_data.vec->data(), 
+				sizeof(MyNum) * ret.my_data.vec->length);
+			break;
+		}
 	}
 	else {
 		_expr = ptr_expr;
@@ -746,6 +846,48 @@ void _expr_end(cmNode*& ptr_expr) {
 		_expr = _expr->get_next();
 	}
 	ptr_expr = _expr;
+}
+
+MyVar init_list_create_data(cmNode*& ptr) {
+	cmNode* _expr = ptr;
+	std::vector<MyVar>vec;
+	MyVar ret;
+	int dimision = 0;
+	while(true)
+	{
+		vec.push_back(CalcExpr_L(_expr));
+		if (_expr->str[0] == '}')break;
+		_expr = _expr->get_next();
+	}
+	if (vec[0].var_type == MyVar::number) {
+		goto _cresult_vec;
+	}
+	if (vec[0].var_type == MyVar::vector) {
+		goto _cresult_mat;
+	}
+	throw "in { ... }";
+_cresult_mat:
+	dimision = vec[0].my_data.vec->length;
+	for (auto& a : vec) {
+		if (a.var_type != MyVar::vector)throw "in { ... } unable to create matrix, check result type";
+		if (a.my_data.vec->length != dimision) throw "in { ... } dimision error";
+	}
+	ret.assign_val(Matrix(dimision, vec.size()));
+	for (int i = 0; i < vec.size(); ++i) {
+		ret.my_data.mat->_assign_c_vector(vec[i].my_data.vec[0], i);
+	}
+	goto _m_f_ret;
+_cresult_vec:
+	for (auto& a : vec) {
+		if (a.var_type != MyVar::number)throw "in { ... } unable to create vector, check result type";
+	}
+	ret.assign_val(Vector(vec.size()));
+	for (int i = 0; i < vec.size();++i) {
+		(*ret.my_data.vec)[i] = vec[i].my_data.num[0];
+	}
+_m_f_ret:
+	ptr = _expr;
+	return ret;
 }
 
 //assume function is rvalue 
@@ -814,7 +956,9 @@ MyVar CalcExpr_R(cmNode*& ptr_expr)
 				goto func_return;
 				break;
 			case '{':
-				//TODO
+				_expr = _expr->get_next();
+				tmp_val_r.assign_val(init_list_create_data(_expr));
+				_M_helper_calcexpr(&ret, flag_neg, _m_op, tmp_val_r);
 				break;
 			default:
 				_m_op = _expr->str[0];
@@ -826,47 +970,49 @@ MyVar CalcExpr_R(cmNode*& ptr_expr)
 				switch (_expr->str[0])
 				{
 				case '<':
+				{
+					auto m_len = _expr->length;
 					_expr = _expr->get_next();
 					tmp_val_r.assign_val(CalcExpr_R(_expr));
 					if (ret.var_type != MyVar::number &&
 						tmp_val_r.var_type != MyVar::number)throw "cannot compare...";
-					if (_expr->length == 2)
+					if (m_len == 2)
 						ret.assign_val(MyNum(ret.my_data.num->operator<=(
 							*tmp_val_r.my_data.num)));
 					else
 						ret.assign_val(MyNum(ret.my_data.num->operator<(
 							*tmp_val_r.my_data.num)));
-					goto func_return;
-					break;
+				}
+				goto func_return;
 				case '>':
-					_expr = _expr->get_next();
-					tmp_val_r.assign_val(CalcExpr_R(_expr));
-					if (ret.var_type != MyVar::number &&
-						tmp_val_r.var_type != MyVar::number)throw "cannot compare...";
-					if (_expr->length == 2)
-						ret.assign_val(MyNum(ret.my_data.num->operator>=(
-							*tmp_val_r.my_data.num)));
-					else 
-						ret.assign_val(MyNum(ret.my_data.num->operator>(
-							*tmp_val_r.my_data.num)));
+				{
+				auto m_len = _expr->length;
+				_expr = _expr->get_next();
+				tmp_val_r.assign_val(CalcExpr_R(_expr));
+				if (ret.var_type != MyVar::number &&
+					tmp_val_r.var_type != MyVar::number)throw "cannot compare...";
+				if (m_len)
+					ret.assign_val(MyNum(ret.my_data.num->operator>=(
+						*tmp_val_r.my_data.num)));
+				else
+					ret.assign_val(MyNum(ret.my_data.num->operator>(
+						*tmp_val_r.my_data.num)));
+				}
 					goto func_return;
-					break;
 				case '=':
 					tmp_val_r.assign_val(CalcExpr_R(_expr));
 					ret.assign_val(MyNum(
 						(int)(ret == tmp_val_r)
 					));
-					if (flag_not)flag_not = false, ret._Not();
 					goto func_return;
-					break;
 				}
 				break;
 			case cmNode::mOPLOG:
 				switch (_expr->str[0])
 				{
 				case '|':
-					_expr = _expr->get_next();
 					if (_expr->length == 2) {
+						_expr = _expr->get_next();
 						if (ret.my_data.num->_up != 0) {
 							_expr = _expr->get_next();
 							_expr_end(_expr);
@@ -879,8 +1025,8 @@ MyVar CalcExpr_R(cmNode*& ptr_expr)
 					}
 					break;
 				case '&':
-					_expr = _expr->get_next();
 					if (_expr->length == 2) {
+						_expr = _expr->get_next();
 						if (ret.my_data.num->_up == 0) {
 							_expr = _expr->get_next();
 							_expr_end(_expr);
@@ -888,7 +1034,7 @@ MyVar CalcExpr_R(cmNode*& ptr_expr)
 						}
 						tmp_val_r.assign_val(CalcExpr_R(_expr));
 						ret.assign_val(MyNum(
-							ret.my_data.num->_up || tmp_val_r.my_data.num->_up
+							ret.my_data.num->_up && tmp_val_r.my_data.num->_up
 						));
 					}
 					break;

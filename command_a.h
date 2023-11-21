@@ -71,6 +71,8 @@ public:
 	void insert(cmNode* _Node);
 };
 
+extern bool fCallerUSRdefFUNC;
+
 #define STACK_PUSHPOP_CHECKLEVEL 1
 
 extern char* _My_Stack_Poiner;

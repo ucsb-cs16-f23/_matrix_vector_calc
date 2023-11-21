@@ -420,6 +420,18 @@ Vector Matrix::ExtractRowVector(int i)
 	return Vector(width, mat[i]);
 }
 
+void Matrix::_assign_c_vector(const Vector& _vec, int _i)
+{
+	for (int i = 0; i < height; ++i) {
+		mat[i][_i] = _vec[i];
+	}
+}
+
+MyNum* Matrix::lval_ref(int _i)
+{
+	return mat[_i];
+}
+
 int Matrix::find_nozero_start_indix(int start_at, int line_inidx)
 {
 	int ret = -1;

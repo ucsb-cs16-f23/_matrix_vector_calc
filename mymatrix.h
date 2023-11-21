@@ -59,6 +59,12 @@ public:
 	Vector(Vector&& _Right)noexcept;
 	Vector(const Vector& _Left);
 	~Vector();
+	MyNum* data() {
+		return _vec;
+	}
+	const MyNum* data()const {
+		return _vec;
+	}
 
 	iterator begin() {
 		return _vec;
@@ -148,7 +154,6 @@ public:
 		Mat_line& substract(const Mat_line& _val);
 		Mat_line create_temp_line();
 	};
-
 protected:
 	void _allocate_space();
 	void copy_data(MyNum** _src);
@@ -183,6 +188,8 @@ public:
 	Matrix CofactorsMatrix();
 	void SetDimision(int _Width, int _Height);
 	Vector ExtractRowVector(int i);
+	void _assign_c_vector(const Vector& _vec, int _i);
+	MyNum* lval_ref(int _i);
 };
 
 #endif // !_MY_MATRIX_H_

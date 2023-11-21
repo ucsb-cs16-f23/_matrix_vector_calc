@@ -190,10 +190,10 @@ MyVar MyVar::_at(const MyVar& _i) const
     switch (var_type)
     {
     case MyVar::matrix:
-        ret.assign_val(my_data.mat->ExtractRowVector(_i.my_data.num->_up));
+        ret.assign_val(my_data.mat->ExtractRowVector((int)_i.my_data.num->_up));
         break;
     case MyVar::vector:
-        ret.assign_val<MyNum>(my_data.vec->operator[](_i.my_data.num->_up));
+        ret.assign_val<MyNum>(my_data.vec->operator[]((int)_i.my_data.num->_up));
         break;
     default:
         throw "operator \'[]\' is called on a number";
