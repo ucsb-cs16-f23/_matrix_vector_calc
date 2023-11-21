@@ -183,6 +183,25 @@ void MyVar::set_negetive()
     }
 }
 
+MyVar MyVar::_at(const MyVar& _i) const
+{
+    MyVar ret;
+    if (_i.var_type != MyVar::number)throw 113;
+    switch (var_type)
+    {
+    case MyVar::matrix:
+        ret.assign_val(my_data.mat->ExtractRowVector(_i.my_data.num->_up));
+        break;
+    case MyVar::vector:
+        ret.assign_val<MyNum>(my_data.vec->operator[](_i.my_data.num->_up));
+        break;
+    default:
+        throw "operator \'[]\' is called on a number";
+        break;
+    }
+    return ret;
+}
+
 void MyVar::discard_data()
 {
     switch (var_type)

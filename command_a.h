@@ -1,12 +1,13 @@
 #ifndef _COMMAND_A_H_
 #define _COMMAND_A_H_
+
 #include<new>
 #include<utility>
 #include"my_Vars.h"
 #include<type_traits>
 
 class cmNode {
-private:
+protected:
 	cmNode* pPrev;
 	cmNode* pNext;
 	static char op_table[256];
@@ -19,6 +20,7 @@ private:
 	}
 	static int mov_to_next(char*& _str);
 	static int op_length(char* str);
+	cmNode(const cmNode&);
 public:
 	char* str;
 	int length;
@@ -39,10 +41,10 @@ public:
 	cmNode();
 	cmNode(char* _str, int);
 	~cmNode();
-	cmNode(const cmNode&) = delete;
 	void append(cmNode* nd);
 	cmNode* find_back();
 	cmNode* find_head();
+	cmNode* replace(cmNode* _x, bool clear_this = true);
 
 	static cmNode* create_list(char* _str);
 	void print_node();

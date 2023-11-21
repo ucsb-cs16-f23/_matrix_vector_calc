@@ -414,6 +414,12 @@ void Matrix::SetDimision(int _Width, int _Height)
 	_allocate_space();
 }
 
+Vector Matrix::ExtractRowVector(int i)
+{
+	if (i < 0 || i >= height)throw 8;
+	return Vector(width, mat[i]);
+}
+
 int Matrix::find_nozero_start_indix(int start_at, int line_inidx)
 {
 	int ret = -1;
@@ -447,22 +453,10 @@ void Matrix::_allocate_space()
 
 void Matrix::copy_data(MyNum** src)
 {
+	auto _size = sizeof(MyNum) * width;
 	for (int i = 0; i < height; ++i)
 	{
-		for (int j = 0; j < width; ++j)
-		{
-			mat[i][j] = src[i][j];
-		}
-	}
-}
-
-void Matrix::_copy_data(MyNum** _src, int start_row, int start_c, int sx, int sy, int _hei, int _wid)
-{
-	for (int i = 0; i < _hei; i++)
-	{
-		for (int j = 0; j < _wid; ++j) {
-			mat[start_row + i][start_c + j] = _src[sx + i][sy + j];
-		}
+		memcpy_s(mat[i], _size, src[i], _size);
 	}
 }
 
@@ -777,29 +771,28 @@ void Matrix::format_output_val(std::ostream& _stream, const MyNum& _val)
 	for (int i = 0; i < cnt_space_put; ++i)_stream.put(' ');
 }
 
-void Vector::_allocate_space()
+void Vector::_allocate_space(MyNum* initialize_data)
 {
-	_vec = new MyNum[length];
+	_vec = (MyNum*)operator new( sizeof(MyNum)*length);
+	if (initialize_data)_copy_data(initialize_data);
 }
 
 void Vector::_copy_data(MyNum* _src)
 {
-	for (int i = 0; i < length; i++)
-	{
-		_vec[i] = _src[i];
-	}
+	auto _size = sizeof(MyNum) * length;
+	memcpy_s(_vec, _size, _src, _size);
 }
 
 void Vector::_discard_data()
 {
-	delete[] _vec;
+	operator delete( _vec);
 	_vec = nullptr;
 }
 
-Vector::Vector(int _size)
+Vector::Vector(int _size, MyNum* iptr)
 {
 	length = _size;
-	_allocate_space();
+	_allocate_space(iptr);
 }
 
 Vector::Vector(Vector&& _Right) noexcept

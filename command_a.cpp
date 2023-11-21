@@ -99,8 +99,8 @@ cmNode::cmNode(char* _str,int len)
 		break;
 	}
 	if (type == mIDENTIFIER) {
-		if (str[0] >= '0' && str[0] <= '9'){
-			type = mVALUE; 
+		if (str[0] >= '0' && str[0] <= '9') {
+			type = mVALUE;
 			goto func_end;
 		}
 		get_cstr();
@@ -174,6 +174,18 @@ cmNode* cmNode::find_head()
 	return ptr;
 }
 
+cmNode* cmNode::replace(cmNode* _x, bool c_i)
+{
+	if (pPrev) {
+		pPrev->pNext = _x;
+	}
+	if (pNext)pNext->pPrev = _x;
+	_x->pPrev = this->pPrev;
+	_x->pNext = this->pNext;
+	if(c_i)delete this;
+	return _x;
+}
+
 int cmNode::op_length(char* str)
 {
 	if (str[0] == '-') {
@@ -201,6 +213,15 @@ int cmNode::op_length(char* str)
 			return 2;
 	}
 	return 1;
+}
+
+cmNode::cmNode(const cmNode&b)
+{
+	pPrev = b.pPrev;
+	pNext = b.pNext;
+	str = b.str;
+	type = b.type;
+	length = b.length;
 }
 
 cmNode* cmNode::create_list(char* _str)
@@ -258,9 +279,11 @@ void cmNode::table_init()
 	op_set('|', chOp_1);
 	op_set('&', chOp_1);
 	op_set('?', chOp_1);
-	op_set(']', chOp_1);
+	op_set(']', chBound);
 	op_set('[', chOp_1);
 	op_set(':', chBound);
+	op_set('{', chOp_1);
+	op_set('}', chBound);
 
 	op_set(',', chBound);
 	op_set(' ', 5);
@@ -360,7 +383,6 @@ void determine_sequence(cmNode* _expr) {
 			}
 			if ((_expr->is_end()))_expr->append(new cmNode(_m_shared_right, 1));
 			else _expr->insert(new cmNode(_m_shared_right, 1));
-
 		}
 		_expr = _expr->get_next();
 	}
@@ -414,7 +436,7 @@ MyVar CreateVector(char* _A1)
 	ret.assign_val(Vector(_cnt));
 	for (auto& a : *ret.my_data.vec) {
 		vp = &_VA_arg<MyVar>(ap);
-		a = *vp->my_data.num;
+		a = *(vp->my_data.num);
 		vp->~MyVar();
 	}
 	return ret;
@@ -463,7 +485,7 @@ func_end:
 }
 
 MyVar SetSepIndix(Matrix* mat, MyNum indix) {
-	mat->seperate_index = indix._up;
+	mat->seperate_index = (int)indix._up;
 	MyVar ret;
 	ret.assign_val<Matrix>(*mat);
 	return ret;
@@ -475,10 +497,13 @@ MyVar CreateMatrix(char* _A1)
 	int _cnt = 0;
 	char* ap;
 	_VA_start(ap, _A1);
-	int wid = _VA_arg<MyVar>(ap).my_data.num->_up;
-	int hei = _VA_arg<MyVar>(ap).my_data.num->_up;
+	MyVar* vp = &_VA_arg<MyVar>(ap);
+	int wid =vp->my_data.num->_up;
+	vp->~MyVar();
+	vp = &_VA_arg<MyVar>(ap);
+	int hei = vp->my_data.num->_up;
+	vp->~MyVar();
 	ret.assign_val(Matrix(wid, hei));
-	MyVar* vp;
 	for (int i = 0; i < hei; ++i) {
 		for (int j = 0; j < wid; ++j) {
 			vp = &_VA_arg<MyVar>(ap);
@@ -740,17 +765,19 @@ MyVar CalcExpr_R(cmNode*& ptr_expr)
 		{
 		case cmNode::mType::idVAR:
 			tmp_val_r.assign_val<MyVar>(*FindVar(_expr->get_cstr()));
-			if (flag_not)flag_not = false, tmp_val_r._Not();
-			_M_helper_calcexpr(&ret, flag_neg, _m_op, tmp_val_r);
-			break;
+			goto _m_exp_calcp;
 		case cmNode::mType::idFUNC:
 			tmp_val_r.assign_val(RvalRetFunctionCaller(_expr));
-			if (flag_not)flag_not = false, tmp_val_r._Not();
-			_M_helper_calcexpr(&ret, flag_neg, _m_op, tmp_val_r);
-			break;
+			goto _m_exp_calcp;
 		case cmNode::mType::mVALUE:
-			tmp_val_r.assign_val(MyNum(atoll(_expr->get_cstr())));
-			if (flag_not)flag_not = false, tmp_val_r._Not();//!1 ? is that  meaningful??
+			tmp_val_r.assign_val(MyNum(atoi(_expr->get_cstr())));
+		_m_exp_calcp:
+			while (!(_expr->is_end())&&_expr->get_next()->str[0] == '[')
+			{
+				_expr = _expr->get_next()->get_next();
+				tmp_val_r.assign_val(tmp_val_r._at(CalcExpr_L(_expr)));
+			}
+			if (flag_not)flag_not = false, tmp_val_r._Not();
 			_M_helper_calcexpr(&ret, flag_neg, _m_op, tmp_val_r);
 			break;
 		case cmNode::mType::mOPERATOR:
@@ -783,17 +810,10 @@ MyVar CalcExpr_R(cmNode*& ptr_expr)
 					_expr = _expr->get_next();
 					ret.assign_val(CalcExpr_R(_expr));
 				}
+				//support conditional exprssion
 				goto func_return;
 				break;
-			case '[':
-				//TODO: 
-				break;
-			case ']':
-				goto func_return;
 			case '{':
-				//TODO
-				break;
-			case '}':
 				//TODO
 				break;
 			default:

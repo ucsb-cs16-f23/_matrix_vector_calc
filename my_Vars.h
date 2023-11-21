@@ -93,6 +93,7 @@ public:
 	bool operator==(const MyVar& b)const;
 	void _Not();
 	void set_negetive();
+	MyVar _at(const MyVar& _i)const;
 protected:
 	void discard_data();
 	void copy_data(const void* Ptr);

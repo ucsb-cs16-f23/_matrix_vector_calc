@@ -49,12 +49,12 @@ class Vector {
 	using value_type = MyNum;
 protected:
 	MyNum* _vec;
-	void _allocate_space();
+	void _allocate_space(MyNum* initialize_data = nullptr);
 	void _copy_data(MyNum* _src);
 	void _discard_data();
 public:
 	int length;
-	Vector(int _size);
+	Vector(int _size, MyNum* iptr = nullptr);
 	constexpr Vector() :_vec(nullptr), length(0){}
 	Vector(Vector&& _Right)noexcept;
 	Vector(const Vector& _Left);
@@ -152,7 +152,6 @@ public:
 protected:
 	void _allocate_space();
 	void copy_data(MyNum** _src);
-	void _copy_data(MyNum** _src, int start_row, int start_c, int sr,int sc, int _hei, int _wid);
 	void _free_space();
 	int find_nozero_start_indix(int start_at, int line_indix);
 	void _copy_data_higher_dimision(MyNum** _src, int ignore_row, int ignore_colum);
@@ -183,6 +182,7 @@ public:
 	Matrix MinorsMatrix();
 	Matrix CofactorsMatrix();
 	void SetDimision(int _Width, int _Height);
+	Vector ExtractRowVector(int i);
 };
 
 #endif // !_MY_MATRIX_H_
