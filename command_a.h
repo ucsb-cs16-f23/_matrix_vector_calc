@@ -34,7 +34,8 @@ public:
 		mExprEND,
 		mOPCMP,
 		mOPLOG,
-		idUNDEFINED
+		idUNDEFINED,
+		SPECIAL_CHAR_BLOCK_BEGIN
 	};
 	mType type;
 	void clean_up();
@@ -45,20 +46,21 @@ public:
 	cmNode* find_back();
 	cmNode* find_head();
 	cmNode* replace(cmNode* _x, bool clear_this = true);
+	void insert_after(cmNode* _x);
 
 	static cmNode* create_list(char* _str);
 	void print_node();
 
-	bool is_end() {
+	inline bool is_end() {
 		return pNext == nullptr;
 	}
-	cmNode* get_next() {
+	inline cmNode* get_next() {
 		return pNext;
 	}
-	cmNode* get_prev() {
+	inline cmNode* get_prev() {
 		return pPrev;
 	}
-	bool is_head() {
+	inline bool is_head() {
 		return pPrev == nullptr;
 	}
 
@@ -213,7 +215,7 @@ MyVar CalcExpr_L(cmNode*& ptr_expr);
 
 void FunctionClassINIT(unsigned dwStackSize, unsigned dwRetAsize);
 
-void determine_sequence(cmNode* _expr);
+void determine_sequence(cmNode* _expr, cmNode* _end = nullptr);
 
 template<class _Ret>
 class MyFunc_VA :public FuncBase {

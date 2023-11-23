@@ -1,4 +1,5 @@
 ﻿#include "command_a.h"
+#include<string>
 #include<cstring>
 #include<iostream>
 #include"my_Vars.h"
@@ -17,6 +18,16 @@ char _m_shared_left[3] = "(";
 char _m_shared_right[3] = ")";
 bool fWarningNewVar = true;
 bool fCallerUSRdefFUNC = false;
+
+std::string ContactStrs(std::string str_1, const std::string& _s) {
+	str_1 += _s;
+	return std::move(str_1);
+}
+
+template<class... Va>
+std::string ContactStrs(std::string str_1, const std::string& Str, Va... a) {
+	return ContactStrs(ContactStrs(str_1, Str), a...);
+}
 
 
 int cmNode::mov_to_next(char*& _str)
@@ -100,6 +111,9 @@ cmNode::cmNode(char* _str,int len)
 		type = idUNDEFINED;
 		break;
 	}
+	if (type == mOPERATOR) {
+		if (str[0] == '(' || str[0] == '[' || str[0] == '{')type = SPECIAL_CHAR_BLOCK_BEGIN;
+	}
 	if (type == mIDENTIFIER) {
 		if (str[0] >= '0' && str[0] <= '9') {
 			type = mVALUE;
@@ -119,27 +133,6 @@ cmNode::cmNode(char* _str,int len)
 			}
 		}
 		type = idUNDEFINED;
-	}
-	if (type == mOPERATOR) {
-		switch (str[0])
-		{
-		case '=':
-			if (length == 2)type = mOPCMP;
-			break;
-		case '<':
-		case '>':
-			type = mOPCMP;
-			break;
-		case '!':
-			type = mOPLOG;
-			break;
-		case '|':
-		case '&':
-			if (length == 2)type = mOPLOG;
-			break;
-		default:
-			break;
-		}
 	}
 	func_end:
 	return;
@@ -186,6 +179,16 @@ cmNode* cmNode::replace(cmNode* _x, bool c_i)
 	_x->pNext = this->pNext;
 	if(c_i)delete this;
 	return _x;
+}
+
+void cmNode::insert_after(cmNode* _x)
+{
+	if (pNext) {
+		pNext->pPrev = _x;
+	}
+	_x->pNext = pNext;
+	_x->pPrev = this;
+	pNext = _x;
 }
 
 int cmNode::op_length(char* str)
@@ -252,9 +255,11 @@ void cmNode::print_node()
 	cmNode* PTR = this;
 	while (PTR)
 	{
-		memcpy_s(buffer, 32, PTR->str, PTR->length);
-		buffer[PTR->length] = '\0';
-		std::cout << buffer<<' ';
+		//if (PTR->type = SPECIAL_CHAR_BLOCK_BEGIN) {
+			memcpy_s(buffer, 32, PTR->str, PTR->length);
+			buffer[PTR->length] = '\0';
+			std::cout << buffer << ' ';
+		//}
 		PTR = PTR->pNext;
 	}
 	std::cout << std::endl;
@@ -345,7 +350,7 @@ FuncBase::FuncBase(const FuncBase& b)
 
 int FuncBase::get_arguments_cnts()
 {
-	return  cnt;
+	return cnt;
 }
 
 MyVar::_m_type FuncBase::get_arg_type(int a_at)
@@ -361,83 +366,248 @@ void FunctionClassINIT(unsigned dwStackSize, unsigned dwRetAsize)
 	FuncBase::ret_area = operator new(dwRetAsize);
 }
 
-void determine_sequence(cmNode* _expr) {
-	cmNode* o_expr = _expr;
-	while (_expr)
+cmNode* BeginOfBlock_1(cmNode* _expr) {
+	int c1 = 0, c2 = 0, c3 = 0;
+	_expr = _expr->get_prev();
+	while (!(_expr->is_head()))
 	{
-		if (_expr->str[0] == '?'&&_expr->get_prev()->str[0]!=')') {
-			int cnt_r = 0;
-			cmNode* _x = _expr;
-			_x->insert(new cmNode(_m_shared_right, 1));
-			_x = _x->get_prev()->get_prev();
-			while ((!(_x->is_head())) && (cnt_r || _x->str[0] != '=' && _x->str[0] != '?' && _x->str[0] != ':'))
+		if (_expr->type == cmNode::mOPERATOR || _expr->type == cmNode::mExprEND)
+			switch (_expr->str[0])
 			{
-				if (_x->str[0] == ')')++cnt_r;
-				if (_x->str[0] == '(')--cnt_r;
-				_x = _x->get_prev();
-			} 
-			if ((_x->is_head()))_x->insert(new cmNode(_m_shared_left, 1));
-			else _x->get_next()->insert(new cmNode(_m_shared_left, 1));
+			case ')':
+				++c1; break;
+			case ']':
+				++c2; break;
+			case '}':
+				++c3; break;
+			case '(':
+				if (c1 == 0)goto func__ret;
+				--c1;
+				break;
+			case '[':
+				if (c1 == 0) {
+					_expr = _expr->get_prev();
+					if (_expr->str[0] == ']')_expr = _expr->get_prev();
+					else goto func__ret;
+				}
+				else --c1;
+				break;
+			case '{':
+				if (c1 == 0)goto func__ret;
+				--c1;
+				break;
+			}
+		_expr = _expr->get_prev();
+	}
+func__ret:
+	return _expr;
+}
+
+cmNode* EndOfBlock_1(cmNode* _expr) {
+	_expr = _expr->get_next();
+	int c1 = 0, c2 = 0, c3 = 0;
+	while (!(_expr->is_end()))
+	{
+		if(_expr->type == cmNode::mOPERATOR||_expr->type == cmNode::mExprEND)
+			switch (_expr->str[0])
+			{
+			case '(':
+				++c1;break;
+			case '[':
+				++c2; break;
+			case '{':
+				++c3; break;
+			case ')':
+				if (c1 == 0)goto func__ret;
+				--c1;
+				break;
+			case ']':
+				if (c1 == 0) goto func__ret;
+				--c1;
+				break;
+			case '}':
+				if (c1 == 0)goto func__ret;
+				--c1;
+				break;
+			}
+		_expr = _expr->get_next();
+	}
+func__ret:
+	if (c1 || c2 || c3)throw "check your expression, did something like \"{ ... ( ... } ... )\" happened?";
+	return _expr;
+}
+
+void determine_sequence(cmNode* _expr, cmNode* _end) {
+	cmNode* o_expr = _expr;
+	while (_expr != _end)
+	{
+		switch (_expr->str[0])
+		{
+		case '(':
+		case '{':
+		case '[':
+			determine_sequence(_expr, _expr = EndOfBlock_1(_expr));
+			break;
 		}
 		_expr = _expr->get_next();
 	}
 	_expr = o_expr;
-	while (_expr)
+	while (_expr!=_end)
 	{
 		if (_expr->str[0] == '*' || _expr->str[0] == '/') {
-			_expr->get_prev()->insert(new cmNode(_m_shared_left, 1));
-			int cnt_left = 0;
-			while (!(_expr->is_end()))
+			switch (_expr->get_prev()->str[0]) {
+			case ')':
+			case ']':
+			case '}':
+				BeginOfBlock_1(_expr->get_prev()->get_prev()
+				)->insert(new cmNode(_m_shared_left, 1));break;
+			default:
+				_expr->get_prev()->insert(new cmNode(_m_shared_left, 1));
+				break;
+			}
+			if (_expr == o_expr)o_expr = o_expr->get_prev();
+			while (_expr!=_end&&_expr->type != cmNode::mExprEND)
 			{
-				if (_expr->str[0] == '(') ++cnt_left;
-				if (_expr->str[0] == ')') {
-					if (cnt_left == 0)break;
-					--cnt_left;
+				if (_expr->type == cmNode::mOPERATOR)switch (_expr->str[0])
+				{
+				case '+':
+					goto _m_while_end;
+				case '-':
+					if (_expr->get_prev()->type != cmNode::mOPERATOR)goto _m_while_end;
+				case '*':
+				case '/':
+					break;
+				case '|':
+				case '<':
+				case '>':
+				case '=':
+				case '&':
+				case '?':
+					goto _m_while_end;
+					break;
 				}
-				if (_expr->str[0] == '+'&&cnt_left == 0) break;
-				if (_expr->str[0] == '-') {
-					if (cnt_left == 0 &&
-						_expr->get_prev()->str[0] != '*' &&
-						_expr->get_prev()->str[0] != '/')break;
+				else if (_expr->type == cmNode::SPECIAL_CHAR_BLOCK_BEGIN)
+					_expr = EndOfBlock_1(_expr);
+				_expr = _expr->get_next();
+			}
+			_m_while_end:
+			if (_expr != _end)_expr->insert(new cmNode(_m_shared_right, 1));
+			else {
+				if (_end) 
+					_expr->insert(new cmNode(_m_shared_right, 1));
+				else 
+					o_expr->append(new cmNode(_m_shared_right, 1));
+				break;
+			}
+		}
+		if (_expr->type == cmNode::SPECIAL_CHAR_BLOCK_BEGIN)
+			_expr = EndOfBlock_1(_expr);
+		_expr = _expr->get_next();
+	}
+	_expr = o_expr;
+	while (_expr!=_end)
+	{
+		if (_expr->type == cmNode::mOPERATOR) 
+			switch (_expr->str[0])
+			{
+			case '=':
+				if (_expr->length == 2)_expr->type = cmNode::mOPCMP;
+				break;
+			case '<':
+			case '>':
+				_expr->type = cmNode::mOPCMP;
+				break;
+			case '!':
+				_expr->type = cmNode::mOPLOG;
+				break;
+			case '|':
+			case '&':
+				if (_expr->length == 2)_expr->type = cmNode::mOPLOG;
+				break;
+			}
+		if (_expr->type == cmNode::SPECIAL_CHAR_BLOCK_BEGIN)
+			_expr = EndOfBlock_1(_expr);
+		_expr = _expr->get_next();
+	}
+	_expr = o_expr;
+	while (_expr!=_end)
+	{
+		if (_expr->type == cmNode::mOPCMP) {
+			auto x = _expr->get_prev();
+			while (!x->is_head())
+			{
+				switch (x->str[0]) {
+				case '(':
+				case '[':
+				case '{':
+				case ',':
+				case '|':
+				case '&':
+				case '?':
+				case ':':
+					x = x->get_next();
+					goto _find_1_end;
+				case ')':
+				case ']':
+				case '}':
+					x = BeginOfBlock_1(x);
+					break;
+				}
+				x = x->get_prev();
+			}
+		_find_1_end:
+			x->insert(new cmNode(_m_shared_left, 1));
+			if (x == o_expr) o_expr = x->get_prev();
+			while (_expr!=_end && _expr->type == cmNode::mExprEND)
+			{
+				switch (_expr->str[0])
+				{
+				case '(':
+				case '{':
+				case '[':
+					_expr = EndOfBlock_1(_expr);
+					break;
+				case '?':
+				case ':':
+				case '|':
+				case '&':
+					goto _find_2_end;
+				case '<':
+				case '>':
+				case '=':
+					if (_expr->length == 2)throw "error! at \"==\" check if\
+ ( ... ) <compare operator> ( ... ) <compare operator> ( ... ) occurs";
 				}
 				_expr = _expr->get_next();
 			}
-			if ((_expr->is_end()))_expr->append(new cmNode(_m_shared_right, 1));
-			else _expr->insert(new cmNode(_m_shared_right, 1));
+		_find_2_end:
+			if (_expr != _end)_expr->insert(new cmNode(_m_shared_right, 1));
+			else {
+				if (_end)
+					_expr->insert(new cmNode(_m_shared_right, 1));
+				else
+					o_expr->append(new cmNode(_m_shared_right, 1));
+				break;
+			}
 		}
+		if (_expr->type == cmNode::SPECIAL_CHAR_BLOCK_BEGIN)
+			_expr = EndOfBlock_1(_expr);
 		_expr = _expr->get_next();
 	}
 	_expr = o_expr;
-	while (!(_expr->is_end()))
-	{
+	cmNode* f_log_op = NULL;
+	while (false) {
+		//TODO
 		if (_expr->type == cmNode::mOPLOG && _expr->str[0] != '!') {
-			cmNode* _x = _expr;
-			_expr->insert(new cmNode(_m_shared_right, 1));
-			_x = _x->get_prev()->get_prev();
-			int rig_cnt = 0;
-			while (!(_x->is_head()))
-			{
-				if (_x->str[0] == ')')++rig_cnt;
-				if (_x->str[0] == '(') {
-					if (rig_cnt)--rig_cnt;
-					else break;
-				}
-				if (_x->type == cmNode::mOPLOG && _expr->str[0] != '!'
-					&& rig_cnt == 0)break;
-				_x = _x->get_prev();
-			}
-			if ((_x->is_head()))_x->insert(new cmNode(_m_shared_left, 1));
+			if(f_log_op==nullptr)f_log_op = _expr;
 		}
+		if (_expr->type == cmNode::SPECIAL_CHAR_BLOCK_BEGIN)
+			_expr = EndOfBlock_1(_expr);
 		_expr = _expr->get_next();
 	}
-	while (!(_expr->is_head()))
-	{
-		if (_expr->type == cmNode::mOPLOG && _expr->str[0] != '!') {
-			_expr = _expr->get_next();
-			_expr->insert(new cmNode(_m_shared_left, 1));
-			_expr->find_back()->append(new cmNode(_m_shared_right, 1));
-		}
-		_expr = _expr->get_prev();
+	if (f_log_op) {
+		f_log_op->insert(new cmNode(_m_shared_right, 1));
+		o_expr->insert(new cmNode(_m_shared_left, 1));
 	}
 }
 
@@ -479,6 +649,7 @@ void procCommand_1(char* _command)
 		_command += len;
 		mVar_list.push_back(MyVar(MyVar::null_var, str.c_str(), NULL));
 		_expr_0 = cmNode::create_list(_command);
+		_expr->print_node();
 		determine_sequence(_expr_0);
 		_expr = _expr_0 = _expr_0->find_head();
 		_expr->print_node();
@@ -594,7 +765,8 @@ void _M_helper_calcexpr(MyVar* ret, bool& flag_neg, char& _m_op, MyVar& ptr_vr) 
 		ret->op_mul(ptr_vr);
 		break;
 	case '/':
-		ret->my_data.num->operator/=(*ptr_vr.my_data.num);
+		*ptr_vr.my_data.num = ptr_vr.my_data.num->reverse();
+		ret->op_mul(ptr_vr);
 		break;
 	default:
 		break;
@@ -870,7 +1042,7 @@ _cresult_mat:
 	dimision = vec[0].my_data.vec->length;
 	for (auto& a : vec) {
 		if (a.var_type != MyVar::vector)throw "in { ... } unable to create matrix, check result type";
-		if (a.my_data.vec->length != dimision) throw "in { ... } dimision error";
+		if (a.my_data.vec->length != dimision) throw "in { ... } dimension error";
 	}
 	ret.assign_val(Matrix(dimision, vec.size()));
 	for (int i = 0; i < vec.size(); ++i) {
@@ -905,6 +1077,24 @@ MyVar CalcExpr_R(cmNode*& ptr_expr)
 	{
 		switch (_expr->type)
 		{
+		case cmNode::SPECIAL_CHAR_BLOCK_BEGIN:
+			switch (_expr->str[0])
+			{
+			case '(':
+				_expr = _expr->get_next();
+				tmp_val_r = CalcExpr_L(_expr);
+				if (flag_not)flag_not = false, tmp_val_r._Not();
+				_M_helper_calcexpr(&ret, flag_neg, _m_op, tmp_val_r);
+				//recursion to calculate value q(≧▽≦q)
+				break;
+			case '{':
+				_expr = _expr->get_next();
+				tmp_val_r.assign_val(init_list_create_data(_expr));
+				_M_helper_calcexpr(&ret, flag_neg, _m_op, tmp_val_r);
+				break;
+
+			}
+			break;
 		case cmNode::mType::idVAR:
 			tmp_val_r.assign_val<MyVar>(*FindVar(_expr->get_cstr()));
 			goto _m_exp_calcp;
@@ -929,13 +1119,6 @@ MyVar CalcExpr_R(cmNode*& ptr_expr)
 			case '-':
 				flag_neg = !flag_neg;
 				break;
-			case '(':
-				_expr = _expr->get_next();
-				tmp_val_r = CalcExpr_L(_expr);
-				if (flag_not)flag_not = false, tmp_val_r._Not();
-				_M_helper_calcexpr(&ret, flag_neg, _m_op, tmp_val_r);
-				//recursion to calculate value q(≧▽≦q)
-				break;
 			case '?':
 				_expr = _expr->get_next();
 				if ((ret.my_data.num->_up)) {
@@ -954,11 +1137,6 @@ MyVar CalcExpr_R(cmNode*& ptr_expr)
 				}
 				//support conditional exprssion
 				goto func_return;
-				break;
-			case '{':
-				_expr = _expr->get_next();
-				tmp_val_r.assign_val(init_list_create_data(_expr));
-				_M_helper_calcexpr(&ret, flag_neg, _m_op, tmp_val_r);
 				break;
 			default:
 				_m_op = _expr->str[0];
