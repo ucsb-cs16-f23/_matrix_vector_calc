@@ -990,11 +990,11 @@ rval_calc:
 			reinterpret_cast<MyVar*>(m_lvalue)->assign_val<MyVar>(ret);
 			break;
 		case 1:
-			if (ret.var_type != MyVar::number)throw "unable to assign ... -> lval";
+			if (ret.var_type != MyVar::number)throw 227;
 			*reinterpret_cast<MyNum*>(m_lvalue) = *ret.my_data.num;
 			break;
 		default:
-			if (ret.var_type != MyVar::vector)throw "unable to assign ... -> lval";
+			if (ret.var_type != MyVar::vector)throw 227;
 			memcpy_s(m_lvalue, lval_assign_ty, ret.my_data.vec->data(), 
 				sizeof(MyNum) * ret.my_data.vec->length);
 			break;

@@ -85,7 +85,7 @@ template<class T>
 void PUSH(const T& _val) {
 	_My_Stack_Poiner -= sizeof(T);
 #if STACK_PUSHPOP_CHECKLEVEL == 1
-	if (_m_stack_end > _My_Stack_Poiner)throw - 1;
+	if (_m_stack_end > _My_Stack_Poiner)throw 114;
 #endif
 	new(_My_Stack_Poiner) T(_val);
 }
@@ -94,7 +94,7 @@ template<class T>
 void PUSH(T&& _val) {
 	_My_Stack_Poiner-= sizeof(T);
 #if STACK_PUSHPOP_CHECKLEVEL == 1
-	if (_m_stack_end > _My_Stack_Poiner)throw - 1;
+	if (_m_stack_end > _My_Stack_Poiner)throw 114;
 #endif
 	new(_My_Stack_Poiner) T(::std::move(_val));
 }
@@ -105,7 +105,7 @@ POP() {
 	using Type = typename std::remove_const<typename std::remove_reference<T>::type>::type;
 	Type ret = ::std::move(*reinterpret_cast<Type*>(_My_Stack_Poiner));
 #if STACK_PUSHPOP_CHECKLEVEL == 1
-	if (_My_Stack_Poiner+sizeof(Type) > _m_stack_begin)throw - 1;
+	if (_My_Stack_Poiner+sizeof(Type) > _m_stack_begin)throw 114;
 #endif
 	if(std::is_pointer<Type>::value == false )reinterpret_cast<Type*>(_My_Stack_Poiner)->~Type();
 	_My_Stack_Poiner += sizeof(Type);

@@ -601,21 +601,21 @@ const MyNum& MyNum::operator*=(const MyNum& b)
 	return *this;
 }
 
-MyNum MyNum::operator*(const MyNum& b)
+MyNum MyNum::operator*(const MyNum& b)const
 {
 	return MyNum(*this).operator*=(b);
 }
 
 const MyNum& MyNum::operator/=(const MyNum& b)
 {
-	if (b._up == 0)throw - 1;
+	if (b._up == 0)throw -1;
 	_up *= b._down;
 	_down *= b._up;
 	simplefied();
 	return *this;
 }
 
-MyNum MyNum::operator/(const MyNum& b)
+MyNum MyNum::operator/(const MyNum& b)const
 {
 	return MyNum(*this).operator/=(b);
 }
@@ -630,7 +630,7 @@ const MyNum& MyNum::operator+=(const MyNum& b)
 	return *this;
 }
 
-MyNum MyNum::operator+(const MyNum& b)
+MyNum MyNum::operator+(const MyNum& b)const
 {
 	return MyNum(*this).operator+=(b);
 }
@@ -645,7 +645,7 @@ const MyNum& MyNum::operator-=(const MyNum& b)
 	return *this;
 }
 
-MyNum MyNum::operator-(const MyNum& b)
+MyNum MyNum::operator-(const MyNum& b)const
 {
 	return MyNum(*this).operator-=(b);
 }
@@ -888,6 +888,16 @@ void Vector::_set_v_neg()
 	for (int i = 0; i < length; ++i) {
 		_vec[i]._up =-_vec[i]._up;
 	}
+}
+
+MyNum Vector::dot_mutipy(const Vector& vec) const
+{
+	MyNum s = 0;
+	if (length != vec.length) throw 11;
+	for (auto i = 0; i < length; ++i) {
+		s += vec[i] * _vec[i];
+	}
+	return s;
 }
 
 void Solution::_discard_data()

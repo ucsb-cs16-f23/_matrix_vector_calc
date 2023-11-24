@@ -20,14 +20,14 @@ public:
 	~MyNum(){}
 
 	const MyNum& operator *= (const MyNum& b);
-	MyNum operator * (const MyNum& b);
+	MyNum operator * (const MyNum& b)const;
 	const MyNum& operator /= (const MyNum& b);
-	MyNum operator / (const MyNum& b);
+	MyNum operator / (const MyNum& b)const;
 
 	const MyNum& operator+= (const MyNum & b);
-	MyNum operator+ (const MyNum& b);
+	MyNum operator+ (const MyNum& b)const;
 	const MyNum& operator -=(const MyNum& b);
-	MyNum operator -(const MyNum& b);
+	MyNum operator -(const MyNum& b)const;
 	void simplefied();
 	bool operator==(const MyNum& b)const;
 	bool operator!=(const MyNum& b)const;
@@ -97,6 +97,7 @@ public:
 	Vector mutiply_num(MyNum _val);
 
 	void _set_v_neg();
+	MyNum dot_mutipy(const Vector& vec)const;
 };
 
 class Solution {

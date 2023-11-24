@@ -77,7 +77,7 @@ const MyVar& MyVar::op_mul(const MyVar& b)
             this->assign_val(b.my_data.mat->multipy_vec(*my_data.vec));
             break;
         case vector:
-            throw 10000;
+            this->assign_val(my_data.vec->dot_mutipy(*b.my_data.vec));
             break;
         }
     }
@@ -186,7 +186,7 @@ void MyVar::set_negetive()
 MyVar MyVar::_at(const MyVar& _i) const
 {
     MyVar ret;
-    if (_i.var_type != MyVar::number)throw 113;
+    if (_i.var_type != MyVar::number)throw 19;
     switch (var_type)
     {
     case MyVar::matrix:
