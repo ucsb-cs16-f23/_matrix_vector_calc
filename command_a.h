@@ -215,7 +215,7 @@ MyVar CalcExpr_L(cmNode*& ptr_expr);
 
 void FunctionClassINIT(unsigned dwStackSize, unsigned dwRetAsize);
 
-void determine_sequence(cmNode* _expr, cmNode* _end = nullptr);
+void determine_sequence(cmNode* start, cmNode* end = nullptr);
 
 template<class _Ret>
 class MyFunc_VA :public FuncBase {

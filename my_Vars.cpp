@@ -268,3 +268,17 @@ MyVar* REF(const Matrix& mat)
     x->my_data.mat->reduced_row_echolon_form();
     return x;
 }
+
+MyVar _det(const Matrix& mat)
+{
+    MyVar ret;
+    ret.assign_val(mat.det());
+    return ret;
+}
+
+MyVar _inverse(const Matrix& mat)
+{
+     MyVar ret;
+     ret.assign_val(mat.inverse_mat());
+     return ret;
+}

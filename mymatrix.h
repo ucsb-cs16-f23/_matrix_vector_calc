@@ -7,6 +7,18 @@ long long gcd(long long a, long long b);
 
 long long lcm(long long a, long long b);
 
+void load_runtime_lib();
+
+struct _tWALKTIME_FLAG {
+	bool debug = true;
+	bool enable_overflow_detect = false;
+	bool disable_warning = false;
+	bool enable_usr_define_function = false;
+	bool support_cmp_and_cond_expr = false;
+};
+
+extern _tWALKTIME_FLAG walktime_flags;
+
 class MyNum {
 public:
 	long long int _up;
@@ -176,7 +188,7 @@ public:
 	void read_matrix_cin();
 	void print_matrix()const;
 	int nozero_entry(int _at_l,int start_indix = 0);
-	Matrix inverse_mat();
+	Matrix inverse_mat()const;
 	Solution analyze_result();
 	Vector extract_vector(int col);
 	Matrix multipy_mat(const Matrix& b)const;

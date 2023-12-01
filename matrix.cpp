@@ -13,14 +13,42 @@ ostream& operator << (ostream& os, const wchar_t* wstr)
     return os;
 }
 
-int main()
+int main(int argc, char** argv)
 {
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
     char* _m_iobuf = new char[2048];
     FunctionClassINIT(4096, 128);
     cmNode::table_init();
     implFuncInit();
-    
+    for (int i = 0; i < argc; ++i) {
+        if (strcmp(argv[i], "fdebug") == 0) {
+            walktime_flags.debug = true;
+            continue;
+        }
+        if (strcmp(argv[i], "fndebug") == 0) {
+            walktime_flags.debug = false;
+            continue;
+        }
+        if (strcmp(argv[i], "disable_warning") == 0) {
+            walktime_flags.disable_warning = true;
+            continue;
+        }
+        if (strcmp(argv[i], "enable_of_detact") == 0) {
+            load_runtime_lib();
+            continue;
+        }
+        if (strcmp(argv[i], "enable_usr_func") == 0) {
+            //TODO
+            walktime_flags.enable_usr_define_function = true;
+            walktime_flags.support_cmp_and_cond_expr = true;
+            continue;
+        }
+        if (strcmp(argv[i], "enable_cmp") == 0) {
+            walktime_flags.support_cmp_and_cond_expr = true;
+            continue;
+        }
+    }
+
     while (true)
     {
         cin.getline(_m_iobuf, 2048, '\n');
@@ -63,7 +91,12 @@ int main()
                 break;
             case 114:
                 cout << L"笨蛋，你在干什么？栈爆掉啦！" << endl;
-            default:
+                break;
+            case 114514:
+                cout << L"如果我说加法溢出惹，阁🤍下🤍该如何应对呢？" << endl;
+                break;
+            case 11451:
+                cout << L"如果我说乘法溢出惹，阁🤍下🤍该如何应对呢？" << endl;
                 break;
             }
         }

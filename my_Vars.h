@@ -106,4 +106,8 @@ MyVar* _create_tmp_var(Matrix&& _mat, const char* _name);
 
 MyVar* REF(const Matrix& mat);
 
+MyVar _det(const Matrix& mat);
+
+MyVar _inverse(const Matrix& mat);
+
 #endif // !_MY_VARS_H_

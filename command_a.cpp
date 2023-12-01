@@ -16,7 +16,6 @@ void* FuncBase::ret_area;
 char cmNode::ret_char_buffer[128];
 char _m_shared_left[3] = "(";
 char _m_shared_right[3] = ")";
-bool fWarningNewVar = true;
 bool fCallerUSRdefFUNC = false;
 
 std::string ContactStrs(std::string str_1, const std::string& _s) {
@@ -371,7 +370,7 @@ cmNode* BeginOfBlock_1(cmNode* _expr) {
 	_expr = _expr->get_prev();
 	while (!(_expr->is_head()))
 	{
-		if (_expr->type == cmNode::mOPERATOR || _expr->type == cmNode::mExprEND)
+		if (_expr->type == cmNode::SPECIAL_CHAR_BLOCK_BEGIN || _expr->type == cmNode::mExprEND)
 			switch (_expr->str[0])
 			{
 			case ')':
@@ -385,16 +384,16 @@ cmNode* BeginOfBlock_1(cmNode* _expr) {
 				--c1;
 				break;
 			case '[':
-				if (c1 == 0) {
+				if (c2 == 0) {
 					_expr = _expr->get_prev();
 					if (_expr->str[0] == ']')_expr = _expr->get_prev();
 					else goto func__ret;
 				}
-				else --c1;
+				else --c2;
 				break;
 			case '{':
-				if (c1 == 0)goto func__ret;
-				--c1;
+				if (c3 == 0)goto func__ret;
+				--c3;
 				break;
 			}
 		_expr = _expr->get_prev();
@@ -408,13 +407,15 @@ cmNode* EndOfBlock_1(cmNode* _expr) {
 	int c1 = 0, c2 = 0, c3 = 0;
 	while (!(_expr->is_end()))
 	{
-		if(_expr->type == cmNode::mOPERATOR||_expr->type == cmNode::mExprEND)
+		if(_expr->type == cmNode::SPECIAL_CHAR_BLOCK_BEGIN||_expr->type == cmNode::mExprEND)
 			switch (_expr->str[0])
 			{
 			case '(':
-				++c1;break;
+				++c1;
+				break;
 			case '[':
-				++c2; break;
+				++c2;
+				break;
 			case '{':
 				++c3; break;
 			case ')':
@@ -422,12 +423,12 @@ cmNode* EndOfBlock_1(cmNode* _expr) {
 				--c1;
 				break;
 			case ']':
-				if (c1 == 0) goto func__ret;
-				--c1;
+				if (c2 == 0) goto func__ret;
+				--c2;
 				break;
 			case '}':
-				if (c1 == 0)goto func__ret;
-				--c1;
+				if (c3 == 0)goto func__ret;
+				--c3;
 				break;
 			}
 		_expr = _expr->get_next();
@@ -439,17 +440,22 @@ func__ret:
 
 void determine_sequence(cmNode* _expr, cmNode* _end) {
 	cmNode* o_expr = _expr;
-	while (_expr != _end)
 	{
-		switch (_expr->str[0])
+		cmNode* x;
+		while (_expr != _end)
 		{
-		case '(':
-		case '{':
-		case '[':
-			determine_sequence(_expr, _expr = EndOfBlock_1(_expr));
-			break;
+			switch (_expr->str[0])
+			{
+			case '(':
+			case '{':
+			case '[':
+				x = EndOfBlock_1(_expr);
+				determine_sequence(_expr ->get_next(), x);
+				_expr = x;
+				break;
+			}
+			_expr = _expr->get_next();
 		}
-		_expr = _expr->get_next();
 	}
 	_expr = o_expr;
 	while (_expr!=_end)
@@ -529,6 +535,7 @@ void determine_sequence(cmNode* _expr, cmNode* _end) {
 			_expr = EndOfBlock_1(_expr);
 		_expr = _expr->get_next();
 	}
+	if (!walktime_flags.support_cmp_and_cond_expr)return;
 	_expr = o_expr;
 	while (_expr!=_end)
 	{
@@ -652,14 +659,14 @@ void procCommand_1(char* _command)
 		_expr->print_node();
 		determine_sequence(_expr_0);
 		_expr = _expr_0 = _expr_0->find_head();
-		_expr->print_node();
+		if(walktime_flags.debug)_expr->print_node();
 		vr = mVar_list.back().assign_val(CalcExpr_L(_expr));
 		goto func_end;
 	}
 	_expr_0 = cmNode::create_list(_command);
-	determine_sequence(_expr_0);
+	determine_sequence( _expr_0);
 	_expr = _expr_0 = _expr_0->find_head();
-	_expr->print_node();
+	if (walktime_flags.debug)_expr->print_node();
 	vr = CalcExpr_L(_expr);
 func_end:
 	if(_expr_0)_expr_0->clean_up();
@@ -718,6 +725,8 @@ void implFuncInit()
 	function_list.push_back(new MyFunc_VA<typename _Rt<decltype(CreateMatrix)>::type>(&CreateMatrix, "CreateMatrix"));
 	function_list.push_back(new MYFUNC(SetSepIndix, "SetSepIndix"));
 	function_list.push_back(new MYFUNC(read_matrix, "read_matrix"));
+	function_list.push_back(new MYFUNC(_det, "det"));
+	function_list.push_back(new MYFUNC(_inverse, "inverse"));
 }
 
 MyVar read_matrix(Matrix* mat)
@@ -924,9 +933,9 @@ MyVar CalcExpr_L(cmNode*& ptr_expr) {
 					m_lvalue = FindVar(cnme);
 					if (m_lvalue == NULL) {
 						if (fCallerUSRdefFUNC) {
-
+							//TODO
 						}
-						else if (fWarningNewVar)
+						else if (!walktime_flags.disable_warning)
 						{
 							cout << "Warning: no such varable \"" << cnme << "\" auto create it\n";
 							mVar_list.push_back(MyVar(MyVar::null_var, cnme, NULL));
@@ -1044,7 +1053,7 @@ _cresult_mat:
 		if (a.var_type != MyVar::vector)throw "in { ... } unable to create matrix, check result type";
 		if (a.my_data.vec->length != dimision) throw "in { ... } dimension error";
 	}
-	ret.assign_val(Matrix(dimision, vec.size()));
+	ret.assign_val(Matrix(vec.size(),dimision));
 	for (int i = 0; i < vec.size(); ++i) {
 		ret.my_data.mat->_assign_c_vector(vec[i].my_data.vec[0], i);
 	}
@@ -1092,7 +1101,6 @@ MyVar CalcExpr_R(cmNode*& ptr_expr)
 				tmp_val_r.assign_val(init_list_create_data(_expr));
 				_M_helper_calcexpr(&ret, flag_neg, _m_op, tmp_val_r);
 				break;
-
 			}
 			break;
 		case cmNode::mType::idVAR:
@@ -1102,7 +1110,7 @@ MyVar CalcExpr_R(cmNode*& ptr_expr)
 			tmp_val_r.assign_val(RvalRetFunctionCaller(_expr));
 			goto _m_exp_calcp;
 		case cmNode::mType::mVALUE:
-			tmp_val_r.assign_val(MyNum(atoi(_expr->get_cstr())));
+			tmp_val_r.assign_val(MyNum(_atoi64(_expr->get_cstr())));
 		_m_exp_calcp:
 			while (!(_expr->is_end())&&_expr->get_next()->str[0] == '[')
 			{

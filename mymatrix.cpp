@@ -1,5 +1,25 @@
 #include "mymatrix.h"
 
+_tWALKTIME_FLAG walktime_flags;
+
+#define DECLARE_POINTER1(_NAME_) long long (*_NAME_)(long long, long long)
+#define DECLARE_POINTER2(_NAME_) void (*_NAME_)(long long*, long long)
+
+DECLARE_POINTER1(Add);
+DECLARE_POINTER1(Sub);
+DECLARE_POINTER1(Mul);
+DECLARE_POINTER2(Addto);
+DECLARE_POINTER2(Multo);
+DECLARE_POINTER2(Subto);
+
+#ifdef _DEBUG
+#define WALK_TIME_LIB "walktime_library_d.dll"
+#else 
+#define WALK_TIME_LIB "walktime_library.dll"
+#endif
+
+
+
 class PutNumF {
 	static long long _capacity_max;
 	char get_digit(int at)const {
@@ -165,11 +185,29 @@ int Matrix::nozero_entry(int _at_l, int start_indix)
 	return ret;
 }
 
-Matrix Matrix::inverse_mat()
+Matrix Matrix::inverse_mat()const
 {
 	if (width!=height)
 	{
 		throw 100;
+	}
+	if (width == 2) {
+		Matrix _ret(width, width);
+		_ret.mat[0][0] = mat[1][1];
+		_ret.mat[1][1] = mat[0][0];
+		_ret.mat[1][0] = -mat[1][0];
+		_ret.mat[0][1] = -mat[0][1];
+		auto _x = (mat[0][0] * mat[1][1]);
+		_x -= (mat[1][0] * mat[0][1]);
+		if (_x == 0) {
+			std::cout << "matrix:\n";
+			print_matrix();
+			std::cout << "is not invertable" << std::endl;
+			throw - 114;
+		}
+		_x = _x.reverse();
+		_ret.multipy_val(_x);
+		return _ret;
 	}
 	Matrix temp(width * 2, height);
 	temp.copy_data(this->mat);
@@ -187,6 +225,14 @@ Matrix Matrix::inverse_mat()
 	{
 		if (temp.mat[i][i] != 1) {
 			return Matrix(0, 0);
+		}
+	}
+	for (int i = 0; i < height; ++i) {
+		if (mat[i][i] != 1) {
+			std::cout << "matrix:\n";
+			print_matrix();
+			std::cout << "is not invertable" << std::endl;
+			throw - 114;
 		}
 	}
 	Matrix ret(width, height);
@@ -328,7 +374,7 @@ Matrix Matrix::multipy_val(const MyNum _val)const
 	{
 		for (int j = 0; j < width; ++j)
 		{
-			ret[i][j] *= _val;
+			ret.mat[i][j] *= _val;
 		}
 	}
 	return ret;
@@ -485,7 +531,7 @@ Matrix::Matrix(int wid, int hei)
 {
 	width = wid;
 	height = hei;
-	seperate_index = width - 1;
+	seperate_index = width;
 	_allocate_space();
 }
 
@@ -551,6 +597,40 @@ long long lcm(long long a, long long b)
 	return a*b/gcd(a,b);
 }
 
+#include<windows.h>
+
+
+
+#ifdef _DEBUG
+#define PROC_ADDR(_FUNC_, _NAME_ ) if(\
+(_FUNC_ = reinterpret_cast<decltype(_FUNC_)>(\
+GetProcAddress(hLib, _NAME_)))==NULL){\
+std::cout<<"unable to load function: "<<_NAME_<<std::endl;\
+return;}
+
+#else
+#define PROC_ADDR(_FUNC_, _NAME_ ) _FUNC_ = reinterpret_cast<decltype(_FUNC_)>(\
+GetProcAddress(hLib, _NAME_))
+#endif // _DEBUG
+
+void load_runtime_lib()
+{
+	auto hLib = LoadLibraryA(WALK_TIME_LIB);
+	if (hLib == NULL) {
+		std::cout << "unable to find: " << WALK_TIME_LIB << std::endl;
+		return;
+	}
+	PROC_ADDR(Add, "safe_add64");
+	PROC_ADDR(Sub, "safe_sub64");
+	PROC_ADDR(Mul, "safe_mul64");
+	PROC_ADDR(Addto, "_add_to");
+	PROC_ADDR(Subto, "_sub_to");
+	PROC_ADDR(Multo, "_mul_to");
+	void (*ecode)(int, int) = reinterpret_cast<decltype(ecode)>(GetProcAddress(hLib, "set_err_code"));
+	ecode(114514, 11451);
+	walktime_flags.enable_overflow_detect = true;
+}
+
 std::istream& operator>>(std::istream& _stream, MyNum& _val)
 {
 	char buffer[64];
@@ -595,7 +675,11 @@ MyNum::MyNum(const MyNum& b)
 
 const MyNum& MyNum::operator*=(const MyNum& b)
 {
-	_up *= b._up;
+	if (walktime_flags.enable_overflow_detect)
+		Multo(&_up, b._up),
+		Multo(&_down, b._down);
+	else
+	_up *= b._up,
 	_down *= b._down;
 	simplefied();
 	return *this;
@@ -609,7 +693,11 @@ MyNum MyNum::operator*(const MyNum& b)const
 const MyNum& MyNum::operator/=(const MyNum& b)
 {
 	if (b._up == 0)throw -1;
-	_up *= b._down;
+	if (walktime_flags.enable_overflow_detect)
+		Multo(&_up, b._down),
+		Multo(&_down, b._up);
+	else
+	_up *= b._down,
 	_down *= b._up;
 	simplefied();
 	return *this;
@@ -623,9 +711,14 @@ MyNum MyNum::operator/(const MyNum& b)const
 const MyNum& MyNum::operator+=(const MyNum& b)
 {
 	if (b._up == 0)return*this;
-	_up *= b._down;
-	_up += _down * b._up;
-	_down *= b._down;
+	if (walktime_flags.enable_overflow_detect)
+		Multo(&_up, b._down),
+		Addto(&_up, Mul(_down, b._down)),
+		Multo(&_down, b._down);
+	else
+		_up *= b._down,
+		_up += _down * b._up,
+		_down *= b._down;
 	simplefied();
 	return *this;
 }
@@ -638,9 +731,14 @@ MyNum MyNum::operator+(const MyNum& b)const
 const MyNum& MyNum::operator-=(const MyNum& b)
 {
 	if (b._up == 0)return*this;
-	_up *= b._down;
-	_up -= _down * b._up;
-	_down *= b._down;
+	if (walktime_flags.enable_overflow_detect)
+		Multo(&_up, b._down),
+		Subto(&_up, Mul(_down, b._down)),
+		Multo(&_down, b._down);
+	else
+		_up *= b._down,
+		_up -= _down * b._up,
+		_down *= b._down;
 	simplefied();
 	return *this;
 }
